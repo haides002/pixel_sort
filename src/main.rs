@@ -9,6 +9,8 @@ fn main() {
     write_image("/home/linus/Dev/rust/pixel_sort/output.jpg", image);
 }
 
+
+// ======== Writing the edited Image ======== //
 fn write_image(file_path: &str, image_data: ImageData) {
     let mut image_buffer = image::RgbImage::new(image_data.width, image_data.height);
 
@@ -16,7 +18,7 @@ fn write_image(file_path: &str, image_data: ImageData) {
 
 
 
-// ========== Reading the File ========== //
+// ============ Reading the File ============ //
 fn read_image(file_path: &str) -> Result<ImageData, image::ImageError> {
     // i now haz a image_buffer
     let binding = image::ImageReader::open(file_path)?.decode()?;

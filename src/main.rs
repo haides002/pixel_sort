@@ -16,7 +16,7 @@ fn write_image(file_path: &str, image_data: ImageData) {
 
 
 
-
+// ========== Reading the File ========== //
 fn read_image(file_path: &str) -> Result<ImageData, image::ImageError> {
     // i now haz a image_buffer
     let binding = image::ImageReader::open(file_path)?.decode()?;

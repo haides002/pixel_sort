@@ -8,6 +8,10 @@ Just a stoopid project to mess around with rust and image modification, please d
 - [ ] implement computing brightness
 - [ ] implement computing hue
 - [ ] implement computing saturation
+- [ ] implement span struct
+- [ ] implement span extraction
 - [ ] implement sort
+- [ ] implement span insertion
 - [ ] implement selection
 - [ ] implement importing selection from file
+- [ ] implement commandline arguments

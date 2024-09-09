@@ -5,7 +5,7 @@ Just a stoopid project to mess around with rust and image modification, please d
 - [x] implement image data struct
 - [x] implement read from file
 - [x] implement write to file
-- [ ] implement computing brightness
+- [x] implement computing brightness
 - [ ] implement computing hue
 - [ ] implement computing saturation
 - [ ] implement span struct

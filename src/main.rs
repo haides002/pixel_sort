@@ -10,6 +10,14 @@ fn main() {
 }
 
 
+
+// ======= Computing Pixel Properties ======= //
+const fn brightness(values:[u8;3]) -> u8 {
+	return (values[0] + values[1] + values[2]) / 3;
+}
+
+
+
 // ======== Writing the edited Image ======== //
 fn write_image(file_path: &str, image_data: ImageData) {
     // create an imagebuffer with the size of our raw data

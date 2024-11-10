@@ -1,19 +1,25 @@
+struct RgbPixel8 {
+	r: u8,
+	g: u8,
+	b: u8,
+}
+
 struct ImageData {
     height: u32,
     width: u32,
-    data: Vec<[u8;3]>,
+    data: Vec<RgbPixel8>,
 }
 
 fn main() {
-    let image = read_image("/home/linus/Dev/rust/pixel_sort/test_image.jpg").unwrap();
-    write_image("/home/linus/Dev/rust/pixel_sort/output.jpg", image);
+    let image = read_image("/home/linus/development/rust/pixel_sort/testing/test_image.jpg").unwrap();
+    write_image("/home/linus/development/rust/pixel_sort/testing/output.jpg", image);
 }
 
 
 
 // ======= Computing Pixel Properties ======= //
-const fn brightness(values:[u8;3]) -> u8 {
-	return (values[0] + values[1] + values[2]) / 3;
+const fn brightness(values: RgbPixel8) -> u8 {
+	return (values.r + values.g + values.b) / 3;
 }
 
 
@@ -30,8 +36,8 @@ fn write_image(file_path: &str, image_data: ImageData) {
         while y < image_data.height {
             let mut x:u32 = 0;
             while x < image_data.width {
-                let pixel = image::Rgb{
-                    0: image_data.data[id],
+            	let pixel = image::Rgb{
+                    0: [image_data.data[id].r, image_data.data[id].g, image_data.data[id].b],
                 };
 
                 image_buffer.as_mut_rgb8().unwrap().put_pixel(x, y, pixel);
@@ -53,7 +59,7 @@ fn read_image(file_path: &str) -> Result<ImageData, image::ImageError> {
     // i now haz a image_buffer
     let binding = image::ImageReader::open(file_path)?.decode()?;
     let image_buffer = binding.as_rgb8().expect("Failed to convert image to rgb8 format!");
-    
+
     // create the image data struct & give it width and height
     let mut image_data = ImageData {
         height: image_buffer.height(),
@@ -67,7 +73,12 @@ fn read_image(file_path: &str) -> Result<ImageData, image::ImageError> {
         while y < image_data.height {
             let mut x:u32 = 0;
             while x < image_data.width {
-                image_data.data.push(image_buffer.get_pixel(x,y).0);
+            	let pixel = RgbPixel8 {
+                    r: image_buffer.get_pixel(x,y).0[0],
+                    g: image_buffer.get_pixel(x,y).0[1],
+                    b: image_buffer.get_pixel(x,y).0[2],
+                };
+                image_data.data.push(pixel);		//WARN:not catching the possible panic
                 x = x + 1;
             }
             y = y + 1;

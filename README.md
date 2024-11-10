@@ -6,8 +6,8 @@ Just a stoopid project to mess around with rust and image modification, please d
 - [x] implement read from file
 - [x] implement write to file
 - [x] implement computing brightness
-- [ ] implement computing hue
-- [ ] implement computing saturation
+- [x] implement computing hue
+- [x] implement computing saturation
 - [ ] implement span struct
 - [ ] implement span extraction
 - [ ] implement sort

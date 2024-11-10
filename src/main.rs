@@ -26,8 +26,9 @@ fn main() {
         g: 135,
         b: 245,
     };
+    let test_data = PixelData::new(test_pixel);
 
-    print!("{}", saturation(test_pixel));
+    print!("{}", test_data.hue());
     let image =
         read_image("/home/linus/development/rust/pixel_sort/testing/test_image.jpg").unwrap();
     write_image(
@@ -37,29 +38,66 @@ fn main() {
 }
 
 // ================================================================================================
-fn luminosity(values: RgbPixel8) -> f32 {
-    let red: f32 = values.r as f32 / 255.0;
-    let green: f32 = values.g as f32 / 255.0;
-    let blue: f32 = values.b as f32 / 255.0;
+// implement HSL functions according to
+// https://www.niwa.nu/2013/05/math-behind-colorspace-conversions-rgb-hsl
 
-    let min: f32 = f32::min(red, f32::min(green, blue)); // for some fucking reason min is not fucking const
-    let max: f32 = f32::max(red, f32::max(green, blue)); // min maxxing
+struct PixelData {
+    red: f32,
+    green: f32,
+    blue: f32,
 
-    0.5 * (max + min)
+    min: f32,
+    max: f32,
 }
 
-fn saturation(values: RgbPixel8) -> f32 {
-    let red: f32 = values.r as f32 / 255.0;
-    let green: f32 = values.g as f32 / 255.0;
-    let blue: f32 = values.b as f32 / 255.0;
+// fuck it im doin OOP now
+impl PixelData {
+    fn new(values: RgbPixel8) -> PixelData {
+        PixelData {
+            red: values.r as f32 / 255.0,
+            green: values.g as f32 / 255.0,
+            blue: values.b as f32 / 255.0,
 
-    let min: f32 = f32::min(red, f32::min(green, blue));
-    let max: f32 = f32::max(red, f32::max(green, blue));
+            min: f32::min(
+                values.r as f32 / 255.0,
+                f32::min(values.g as f32 / 255.0, values.b as f32 / 255.0),
+            ), // for some fucking reason min() is not fucking const
+            max: f32::max(
+                values.r as f32 / 255.0,
+                f32::max(values.g as f32 / 255.0, values.b as f32 / 255.0),
+            ), // min maxxing
+        }
+    }
 
-    if luminosity(values.clone()) < 1.0 {
-        return (max - min) / (1.0 - (2.0 * luminosity(values.clone()) - 1.0).abs());
-    } else {
-        return 0.0;
+    fn luminosity(&self) -> f32 {
+        0.5 * (self.max + self.min)
+    }
+
+    fn saturation(&self) -> f32 {
+        if self.luminosity() < 1.0 {
+            return (self.max - self.min) / (1.0 - (2.0 * self.luminosity() - 1.0).abs());
+        } else {
+            return 0.0;
+        }
+    }
+
+    fn hue(&self) -> f32 {
+        let pre_hue: f32;
+        if self.red == self.max {
+            pre_hue = 60.0 * (0.0 + (self.green - self.blue) / (self.max - self.min));
+        } else if self.green == self.max {
+            pre_hue = 60.0 * (2.0 + (self.blue - self.red) / (self.max - self.min));
+        } else if self.blue == self.max {
+            pre_hue = 60.0 * (4.0 + (self.red - self.green) / (self.max - self.min));
+        } else {
+            panic!();
+        }
+
+        if pre_hue >= 0.0 {
+            return pre_hue;
+        } else {
+            return pre_hue + 360.0;
+        }
     }
 }
 

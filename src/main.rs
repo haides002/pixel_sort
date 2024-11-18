@@ -1,14 +1,46 @@
-struct RgbPixel8 {
+#[derive(Clone, Copy)]
+enum HslComponent {
+    Hue,
+    Saturation,
+    Luminosity,
+}
+
+struct Span {
+    x: u32,
+    y: u32,
+    data: Vec<Pixel>,
+}
+
+// ================================================================================================
+#[derive(Clone, Copy)]
+struct Rgb8 {
     r: u8,
     g: u8,
     b: u8,
 }
-impl Clone for RgbPixel8 {
-    fn clone(&self) -> RgbPixel8 {
-        RgbPixel8 {
-            r: self.r,
-            g: self.g,
-            b: self.b,
+#[derive(Clone, Copy)]
+struct Hsl {
+    hue: f32,
+    saturation: f32,
+    luminosity: f32,
+}
+
+#[derive(Clone, Copy)]
+struct Pixel {
+    rgb: Rgb8,
+    hsl: Hsl,
+}
+impl Pixel {
+    fn new(red: u8, green: u8, blue: u8) -> Pixel {
+        let rgb_values: Rgb8 = Rgb8 {
+            r: red,
+            g: green,
+            b: blue,
+        };
+
+        Pixel {
+            rgb: rgb_values.clone(),
+            hsl: calculate_hsl(rgb_values),
         }
     }
 }
@@ -16,21 +48,15 @@ impl Clone for RgbPixel8 {
 struct ImageData {
     height: u32,
     width: u32,
-    data: Vec<RgbPixel8>,
+    data: Vec<Pixel>,
 }
 
 // ================================================================================================
 fn main() {
-    let test_pixel = RgbPixel8 {
-        r: 66,
-        g: 135,
-        b: 245,
-    };
-    let test_data = PixelData::new(test_pixel);
-
-    print!("{}", test_data.hue());
     let image =
         read_image("/home/linus/development/rust/pixel_sort/testing/test_image.jpg").unwrap();
+    let spans = extract_spans(&image, HslComponent::Luminosity, 0.4, 0.8);
+    let sorted_spans = sort_spans(spans, HslComponent::Luminosity);
     write_image(
         "/home/linus/development/rust/pixel_sort/testing/output.jpg",
         image,
@@ -38,70 +64,142 @@ fn main() {
 }
 
 // ================================================================================================
-// implement HSL functions according to
-// https://www.niwa.nu/2013/05/math-behind-colorspace-conversions-rgb-hsl
+// span fuckery
+fn extract_spans(
+    image: &ImageData,
+    metric: HslComponent,
+    bottom: f32,
+    top: f32,
+    /* direction:? */
+) -> Vec<Span> {
+    let mut spans: Vec<Span> = Vec::new();
+    let mut current_span: Span = Span {
+        x: 0,
+        y: 0,
+        data: Vec::new(),
+    };
 
-struct PixelData {
-    red: f32,
-    green: f32,
-    blue: f32,
+    for (i, value) in image.data.iter().enumerate() {
+        let amogus: f32 = match metric {
+            HslComponent::Hue => todo!("mek good!!!"),
+            HslComponent::Luminosity => value.hsl.luminosity,
+            HslComponent::Saturation => value.hsl.saturation,
+        };
 
-    min: f32,
-    max: f32,
+        if amogus > bottom && amogus < top {
+            current_span.data.push(value.clone());
+            if current_span.data.len() == 0 {
+                // when the first pixel of a span is found
+                current_span.y = i as u32 / image.width;
+                current_span.x = i as u32 % image.width;
+            }
+        } else {
+            if current_span.data.len() > 2 {
+                spans.push(current_span);
+            }
+            current_span = Span {
+                x: 0,
+                y: 0,
+                data: Vec::new(),
+            };
+        }
+    }
+
+    return spans;
 }
 
-// fuck it im doin OOP now
-impl PixelData {
-    fn new(values: RgbPixel8) -> PixelData {
-        PixelData {
-            red: values.r as f32 / 255.0,
-            green: values.g as f32 / 255.0,
-            blue: values.b as f32 / 255.0,
+// this one is ultra ass and absoloutly needs a rework
+fn sort_span(p_span: Span, sort_type: HslComponent) -> Span {
+    //TODO: make it respect HslComponent
+    let mut span: Span = p_span;
+    fn quicksort(mut array: &mut Span, low: usize, high: usize) {
+        if low < high {
+            let pivot: usize = partition(&mut array, low, high);
 
-            min: f32::min(
-                values.r as f32 / 255.0,
-                f32::min(values.g as f32 / 255.0, values.b as f32 / 255.0),
-            ), // for some fucking reason min() is not fucking const
-            max: f32::max(
-                values.r as f32 / 255.0,
-                f32::max(values.g as f32 / 255.0, values.b as f32 / 255.0),
-            ), // min maxxing
+            quicksort(&mut array, low, pivot - 1);
+            quicksort(&mut array, pivot + 1, high);
         }
     }
+    fn partition(array: &mut Span, low: usize, high: usize) -> usize {
+        let pivot: Pixel = *array.data.last().unwrap();
+        let mut i: usize = low;
 
-    fn luminosity(&self) -> f32 {
-        0.5 * (self.max + self.min)
+        for j in low..(high - 1) {
+            if array.data[j].hsl.luminosity <= pivot.hsl.luminosity {
+                //TODO does not respect sort_type
+                array.data.swap(i, j);
+                i = i + 1;
+            }
+        }
+
+        array.data.swap(i, high);
+        return i;
     }
 
-    fn saturation(&self) -> f32 {
-        if self.luminosity() < 1.0 {
-            return (self.max - self.min) / (1.0 - (2.0 * self.luminosity() - 1.0).abs());
-        } else {
-            return 0.0;
-        }
+    let len = span.data.len();
+    quicksort(&mut span, 0, len - 1);
+    span
+}
+
+fn sort_spans(spans: Vec<Span>, sort_type: HslComponent) -> Vec<Span> {
+    let mut sorted_spans: Vec<Span> = Vec::new();
+    for span in spans {
+        sorted_spans.push(sort_span(span, sort_type));
     }
 
-    fn hue(&self) -> f32 {
-        let pre_hue: f32;
-        if self.red == self.max {
-            pre_hue = 60.0 * (0.0 + (self.green - self.blue) / (self.max - self.min));
-        } else if self.green == self.max {
-            pre_hue = 60.0 * (2.0 + (self.blue - self.red) / (self.max - self.min));
-        } else if self.blue == self.max {
-            pre_hue = 60.0 * (4.0 + (self.red - self.green) / (self.max - self.min));
-        } else {
-            panic!();
-        }
+    return sorted_spans;
+}
 
-        if pre_hue >= 0.0 {
-            return pre_hue;
-        } else {
-            return pre_hue + 360.0;
-        }
+// ================================================================================================
+// implement HSL calculation according to
+// https://www.niwa.nu/2013/05/math-behind-colorspace-conversions-rgb-hsl
+
+fn calculate_hsl(rgb_values: Rgb8) -> Hsl {
+    let red: f32 = rgb_values.r as f32 / 255.0;
+    let green: f32 = rgb_values.g as f32 / 255.0;
+    let blue: f32 = rgb_values.b as f32 / 255.0;
+
+    let min: f32 = f32::min(red, f32::min(green, blue)); // for some fucking reason min() is not fucking const
+    let max: f32 = f32::max(red, f32::max(green, blue));
+    // min maxxing
+
+    let luminosity: f32 = 0.5 * (max + min);
+
+    let saturation: f32;
+    if luminosity < 1.0 {
+        saturation = (max - min) / (1.0 - (2.0 * luminosity - 1.0).abs());
+    } else {
+        saturation = 0.0;
+    };
+
+    let hue: f32;
+    let pre_hue: f32;
+    if red == max {
+        pre_hue = 60.0 * (0.0 + (green - blue) / (max - min));
+    } else if green == max {
+        pre_hue = 60.0 * (2.0 + (blue - red) / (max - min));
+    } else if blue == max {
+        pre_hue = 60.0 * (4.0 + (red - green) / (max - min));
+    } else {
+        panic!();
+    }
+    if pre_hue >= 0.0 {
+        hue = pre_hue;
+    } else {
+        hue = pre_hue + 360.0;
+    }
+
+    Hsl {
+        hue,
+        saturation,
+        luminosity,
     }
 }
 
 // ================================================================================================
+// file interaction functions using
+// https://docs.rs/image/latest/image
+
 fn write_image(file_path: &str, image_data: ImageData) {
     // create an imagebuffer with the size of our raw data
     let mut image_buffer =
@@ -116,9 +214,9 @@ fn write_image(file_path: &str, image_data: ImageData) {
             while x < image_data.width {
                 let pixel = image::Rgb {
                     0: [
-                        image_data.data[id].r,
-                        image_data.data[id].g,
-                        image_data.data[id].b,
+                        image_data.data[id].rgb.r,
+                        image_data.data[id].rgb.g,
+                        image_data.data[id].rgb.b,
                     ],
                 };
 
@@ -154,12 +252,11 @@ fn read_image(file_path: &str) -> Result<ImageData, image::ImageError> {
         while y < image_data.height {
             let mut x: u32 = 0;
             while x < image_data.width {
-                let pixel = RgbPixel8 {
-                    r: image_buffer.get_pixel(x, y).0[0],
-                    g: image_buffer.get_pixel(x, y).0[1],
-                    b: image_buffer.get_pixel(x, y).0[2],
-                };
-                image_data.data.push(pixel); //WARN:not catching the possible panic
+                image_data.data.push(Pixel::new(
+                    image_buffer.get_pixel(x, y).0[0],
+                    image_buffer.get_pixel(x, y).0[1],
+                    image_buffer.get_pixel(x, y).0[2],
+                ));
                 x = x + 1;
             }
             y = y + 1;

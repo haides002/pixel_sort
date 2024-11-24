@@ -28,7 +28,7 @@ struct Span {
     data: Vec<Pixel>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct Position {
     x: u32,
     y: u32,
@@ -167,8 +167,7 @@ fn insert_spans(image: &mut ImageData, spans: Vec<Span>, direction: Direction) -
     return image;
 }
 
-//TODO merge sort_span into sort spans
-fn sort_span(mut span: Span, sort_type: HslComponent) -> Span {
+fn sort_spans(spans: &mut Vec<Span>, sort_type: HslComponent) -> Vec<Span> {
     fn sort_pixels(mut pixels: Vec<Pixel>, sort_type: HslComponent) -> Vec<Pixel> {
         // return if sorting is not necessary
         if pixels.len() <= 1 {
@@ -198,14 +197,10 @@ fn sort_span(mut span: Span, sort_type: HslComponent) -> Span {
         sorted
     }
 
-    span.data = sort_pixels(span.data, sort_type);
-    span
-}
-
-fn sort_spans(spans: &mut Vec<Span>, sort_type: HslComponent) -> Vec<Span> {
     let mut sorted_spans: Vec<Span> = Vec::new();
     for span in spans {
-        sorted_spans.push(sort_span(span.clone(), sort_type).clone());
+        span.data = sort_pixels(span.data.clone(), sort_type);
+        sorted_spans.push(span.clone());
     }
 
     return sorted_spans;

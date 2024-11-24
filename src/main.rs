@@ -1,14 +1,37 @@
 #[derive(Clone, Copy)]
+struct Filter {
+    kind: HslComponent,
+    top: f32,
+    bottom: f32,
+}
+
+// ================================================================================================
+#[derive(Clone, Copy)]
+enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+#[derive(Clone, Copy)]
 enum HslComponent {
     Hue,
     Saturation,
     Luminosity,
 }
 
+// ================================================================================================
+#[derive(Clone)]
 struct Span {
+    position: Position,
+    data: Vec<Pixel>,
+}
+
+#[derive(Clone)]
+struct Position {
     x: u32,
     y: u32,
-    data: Vec<Pixel>,
 }
 
 // ================================================================================================
@@ -53,10 +76,26 @@ struct ImageData {
 
 // ================================================================================================
 fn main() {
-    let image =
+    let mut image =
         read_image("/home/linus/development/rust/pixel_sort/testing/test_image.jpg").unwrap();
-    let spans = extract_spans(&image, HslComponent::Luminosity, 0.4, 0.8);
-    let sorted_spans = sort_spans(spans, HslComponent::Luminosity);
+
+    print!("extracting spans:");
+    let mut spans = extract_spans(
+        &image,
+        Filter {
+            kind: HslComponent::Luminosity,
+            bottom: 0.55,
+            top: 1.0,
+        },
+    );
+    print!(" done({})\n", spans.len());
+
+    println!("sorting spans");
+    let sorted_spans = sort_spans(&mut spans, HslComponent::Luminosity);
+
+    println!("inserting spans");
+    insert_spans(&mut image, sorted_spans, Direction::Right);
+
     write_image(
         "/home/linus/development/rust/pixel_sort/testing/output.jpg",
         image,
@@ -65,86 +104,108 @@ fn main() {
 
 // ================================================================================================
 // span fuckery
-fn extract_spans(
-    image: &ImageData,
-    metric: HslComponent,
-    bottom: f32,
-    top: f32,
-    /* direction:? */
-) -> Vec<Span> {
+fn extract_spans(image: &ImageData, filter: Filter) -> Vec<Span> {
+    fn check_eligibility(pixel: Pixel, filter: Filter) -> bool {
+        match filter.kind {
+            HslComponent::Hue => {
+                todo!("mek good!!!");
+            }
+            HslComponent::Luminosity => {
+                pixel.hsl.luminosity >= filter.bottom && pixel.hsl.luminosity <= filter.top
+            }
+            HslComponent::Saturation => {
+                pixel.hsl.saturation >= filter.bottom && pixel.hsl.saturation <= filter.top
+            }
+        }
+    }
+
     let mut spans: Vec<Span> = Vec::new();
     let mut current_span: Span = Span {
-        x: 0,
-        y: 0,
+        position: Position { x: 0, y: 0 },
         data: Vec::new(),
     };
 
-    for (i, value) in image.data.iter().enumerate() {
-        let amogus: f32 = match metric {
-            HslComponent::Hue => todo!("mek good!!!"),
-            HslComponent::Luminosity => value.hsl.luminosity,
-            HslComponent::Saturation => value.hsl.saturation,
-        };
-
-        if amogus > bottom && amogus < top {
-            current_span.data.push(value.clone());
-            if current_span.data.len() == 0 {
-                // when the first pixel of a span is found
-                current_span.y = i as u32 / image.width;
-                current_span.x = i as u32 % image.width;
-            }
-        } else {
-            if current_span.data.len() > 2 {
+    for (i, pixel) in image.data.iter().enumerate() {
+        // check if we need to span break
+        if !check_eligibility(*pixel, filter) || calculate_position(i as u32, image.width).x == 0 {
+            if current_span.data.len() > 1 {
                 spans.push(current_span);
             }
+
             current_span = Span {
-                x: 0,
-                y: 0,
+                position: Position { x: 0, y: 0 },
                 data: Vec::new(),
             };
+        }
+
+        if check_eligibility(*pixel, filter) {
+            if current_span.data.len() == 0 {
+                current_span.position = calculate_position(i as u32, image.width);
+            }
+            current_span.data.push(*pixel);
         }
     }
 
     return spans;
 }
 
-// this one is ultra ass and absoloutly needs a rework
-fn sort_span(p_span: Span, sort_type: HslComponent) -> Span {
-    //TODO: make it respect HslComponent
-    let mut span: Span = p_span;
-    fn quicksort(mut array: &mut Span, low: usize, high: usize) {
-        if low < high {
-            let pivot: usize = partition(&mut array, low, high);
+fn insert_spans(image: &mut ImageData, spans: Vec<Span>, direction: Direction) -> &ImageData {
+    for span in spans {
+        let mut current_pixel_id: u32 = calculate_id(
+            Position {
+                x: span.position.x,
+                y: span.position.y,
+            },
+            image.width,
+        );
 
-            quicksort(&mut array, low, pivot - 1);
-            quicksort(&mut array, pivot + 1, high);
+        for pixel in span.data {
+            image.data[current_pixel_id as usize] = pixel;
+            current_pixel_id = next_pixel_id(current_pixel_id, image.width, direction)
         }
     }
-    fn partition(array: &mut Span, low: usize, high: usize) -> usize {
-        let pivot: Pixel = *array.data.last().unwrap();
-        let mut i: usize = low;
+    return image;
+}
 
-        for j in low..(high - 1) {
-            if array.data[j].hsl.luminosity <= pivot.hsl.luminosity {
-                //TODO does not respect sort_type
-                array.data.swap(i, j);
-                i = i + 1;
+//TODO merge sort_span into sort spans
+fn sort_span(mut span: Span, sort_type: HslComponent) -> Span {
+    fn sort_pixels(mut pixels: Vec<Pixel>, sort_type: HslComponent) -> Vec<Pixel> {
+        // return if sorting is not necessary
+        if pixels.len() <= 1 {
+            return pixels;
+        }
+
+        // chose pivot and initialize left and right parts
+        let pivot: Pixel = pixels.pop().unwrap();
+        let mut left: Vec<Pixel> = Vec::new();
+        let mut right: Vec<Pixel> = Vec::new();
+
+        // divide pixels into two
+        for element in pixels {
+            if element.hsl.luminosity < pivot.hsl.luminosity {
+                left.push(element);
+            } else {
+                right.push(element);
             }
         }
 
-        array.data.swap(i, high);
-        return i;
+        // asseble and return final vector
+        let mut sorted: Vec<Pixel> = Vec::new();
+        sorted.append(&mut sort_pixels(left, sort_type.clone()));
+        sorted.push(pivot);
+        sorted.append(&mut sort_pixels(right, sort_type.clone()));
+
+        sorted
     }
 
-    let len = span.data.len();
-    quicksort(&mut span, 0, len - 1);
+    span.data = sort_pixels(span.data, sort_type);
     span
 }
 
-fn sort_spans(spans: Vec<Span>, sort_type: HslComponent) -> Vec<Span> {
+fn sort_spans(spans: &mut Vec<Span>, sort_type: HslComponent) -> Vec<Span> {
     let mut sorted_spans: Vec<Span> = Vec::new();
     for span in spans {
-        sorted_spans.push(sort_span(span, sort_type));
+        sorted_spans.push(sort_span(span.clone(), sort_type).clone());
     }
 
     return sorted_spans;
@@ -153,7 +214,6 @@ fn sort_spans(spans: Vec<Span>, sort_type: HslComponent) -> Vec<Span> {
 // ================================================================================================
 // implement HSL calculation according to
 // https://www.niwa.nu/2013/05/math-behind-colorspace-conversions-rgb-hsl
-
 fn calculate_hsl(rgb_values: Rgb8) -> Hsl {
     let red: f32 = rgb_values.r as f32 / 255.0;
     let green: f32 = rgb_values.g as f32 / 255.0;
@@ -193,6 +253,29 @@ fn calculate_hsl(rgb_values: Rgb8) -> Hsl {
         hue,
         saturation,
         luminosity,
+    }
+}
+
+// ================================================================================================
+// image helper funktions
+const fn calculate_id(position: Position, width: u32) -> u32 {
+    (position.y * width) + position.x
+}
+
+const fn calculate_position(id: u32, width: u32) -> Position {
+    Position {
+        y: id / width,
+        x: id % width,
+    }
+}
+
+//TODO implement wraping
+const fn next_pixel_id(id: u32, width: u32, direction: Direction) -> u32 {
+    match direction {
+        Direction::Right => id + 1,
+        Direction::Left => id - 1,
+        Direction::Down => id + width,
+        Direction::Up => id - width,
     }
 }
 

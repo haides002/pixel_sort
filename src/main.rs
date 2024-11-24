@@ -76,8 +76,10 @@ struct ImageData {
 
 // ================================================================================================
 fn main() {
+    print!("reading image:");
     let mut image =
         read_image("/home/linus/development/rust/pixel_sort/testing/test_image.jpg").unwrap();
+    print!(" done\n");
 
     print!("extracting spans:");
     let mut spans = extract_spans(
@@ -161,7 +163,8 @@ fn insert_spans(image: &mut ImageData, spans: Vec<Span>, direction: Direction) -
 
         for pixel in span.data {
             image.data[current_pixel_id as usize] = pixel;
-            current_pixel_id = next_pixel_id(current_pixel_id, image.width, direction)
+            current_pixel_id =
+                next_pixel_id(current_pixel_id, image.width, image.height, direction).unwrap();
         }
     }
     return image;
@@ -264,13 +267,36 @@ const fn calculate_position(id: u32, width: u32) -> Position {
     }
 }
 
-//TODO implement wraping
-const fn next_pixel_id(id: u32, width: u32, direction: Direction) -> u32 {
+const fn next_pixel_id(id: u32, width: u32, height: u32, direction: Direction) -> Option<u32> {
+    let result: u32;
     match direction {
-        Direction::Right => id + 1,
-        Direction::Left => id - 1,
-        Direction::Down => id + width,
-        Direction::Up => id - width,
+        Direction::Right => {
+            result = id + 1;
+        }
+        Direction::Left => {
+            result = id - 1;
+        }
+        Direction::Down => {
+            if (id + width) <= (width * height) {
+                result = id + width;
+            } else {
+                result = (id % width) + 1; // but im not a rapper
+            }
+        }
+        Direction::Up => {
+            if (id as i32 - width as i32) >= 0 {
+                result = id - width;
+            } else {
+                result = ((height - 1) * 7) + (id - 1);
+            }
+        }
+    }
+
+    // check if we are still inbounds otherwise return none
+    if result < (width * height) {
+        return Option::Some(result);
+    } else {
+        return Option::None;
     }
 }
 

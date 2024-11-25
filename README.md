@@ -2,7 +2,6 @@
 Just a stoopid project to mess around with rust and image modification, please don't use.
 
 # Issues
-- [ ] fix bottom row of pixels not being sorted
 
 # Tasks
 - [x] implement image data struct
@@ -16,5 +15,5 @@ Just a stoopid project to mess around with rust and image modification, please d
 - [x] implement sort
 - [x] implement span insertion
 - [x] implement selection
-- [ ] implement importing selection from file
 - [ ] implement commandline arguments
+- [ ] implement importing selection from file

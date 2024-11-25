@@ -86,7 +86,7 @@ fn main() {
         &image,
         Filter {
             kind: HslComponent::Luminosity,
-            bottom: 0.55,
+            bottom: 0.0,
             top: 1.0,
         },
         Direction::Up,

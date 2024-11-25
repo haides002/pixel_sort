@@ -2,6 +2,7 @@
 Just a stoopid project to mess around with rust and image modification, please don't use.
 
 # Issues
+- [ ] something goes wrong when sorting down with the grainy woods image
 
 # Tasks
 - [x] implement image data struct

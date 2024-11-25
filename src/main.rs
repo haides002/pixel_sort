@@ -89,6 +89,7 @@ fn main() {
             bottom: 0.55,
             top: 1.0,
         },
+        Direction::Up,
     );
     print!(" done({})\n", spans.len());
 
@@ -96,7 +97,7 @@ fn main() {
     let sorted_spans = sort_spans(&mut spans, HslComponent::Luminosity);
 
     println!("inserting spans");
-    insert_spans(&mut image, sorted_spans, Direction::Right);
+    insert_spans(&mut image, sorted_spans, Direction::Up);
 
     write_image(
         "/home/linus/development/rust/pixel_sort/testing/output.jpg",
@@ -106,7 +107,7 @@ fn main() {
 
 // ================================================================================================
 // span fuckery
-fn extract_spans(image: &ImageData, filter: Filter) -> Vec<Span> {
+fn extract_spans(image: &ImageData, filter: Filter, direction: Direction) -> Vec<Span> {
     fn check_eligibility(pixel: Pixel, filter: Filter) -> bool {
         match filter.kind {
             HslComponent::Hue => {
@@ -127,9 +128,20 @@ fn extract_spans(image: &ImageData, filter: Filter) -> Vec<Span> {
         data: Vec::new(),
     };
 
-    for (i, pixel) in image.data.iter().enumerate() {
+    //for (i, pixel) in image.data.iter().enumerate() {
+    let mut id: u32 = match direction {
+        Direction::Right => 0,
+        Direction::Down => 0,
+        Direction::Up => image.width * image.height - 1,
+        Direction::Left => image.width * image.height - 1,
+    };
+
+    loop {
         // check if we need to span break
-        if !check_eligibility(*pixel, filter) || calculate_position(i as u32, image.width).x == 0 {
+        if !check_eligibility(image.data[id as usize], filter)
+            || calculate_position(id as u32, image.width).x == 0
+            || calculate_position(id as u32, image.width).y == 0
+        {
             if current_span.data.len() > 1 {
                 spans.push(current_span);
             }
@@ -140,11 +152,21 @@ fn extract_spans(image: &ImageData, filter: Filter) -> Vec<Span> {
             };
         }
 
-        if check_eligibility(*pixel, filter) {
-            if current_span.data.len() == 0 {
-                current_span.position = calculate_position(i as u32, image.width);
+        if check_eligibility(image.data[id as usize], filter) {
+            if current_span.data.is_empty() {
+                current_span.position = calculate_position(id, image.width);
             }
-            current_span.data.push(*pixel);
+            current_span.data.push(image.data[id as usize]);
+        }
+
+        match next_pixel_id(id, image.width, image.height, direction) {
+            None => {
+                break;
+            }
+            Some(new_id) => {
+                id = new_id;
+                continue;
+            }
         }
     }
 
@@ -268,35 +290,39 @@ const fn calculate_position(id: u32, width: u32) -> Position {
 }
 
 const fn next_pixel_id(id: u32, width: u32, height: u32, direction: Direction) -> Option<u32> {
-    let result: u32;
+    if id >= width * height {
+        panic!("next_pixel_id: id is out of bounds");
+    }
+
     match direction {
         Direction::Right => {
-            result = id + 1;
+            if id + 1 >= width * height {
+                return None;
+            } else {
+                return Some(id + 1);
+            }
         }
         Direction::Left => {
-            result = id - 1;
+            return id.checked_sub(1);
         }
         Direction::Down => {
-            if (id + width) <= (width * height) {
-                result = id + width;
+            if (id + width) < (width * height) {
+                return Some(id + width);
+            } else if id == width * height - 1 {
+                return None;
             } else {
-                result = (id % width) + 1; // but im not a rapper
+                return Some((id % width) + 1); // but im not a rapper
             }
         }
         Direction::Up => {
-            if (id as i32 - width as i32) >= 0 {
-                result = id - width;
+            if id == 0 {
+                return None;
+            } else if (id as i32 - width as i32) >= 0 {
+                return Some(id - width);
             } else {
-                result = ((height - 1) * 7) + (id - 1);
+                return Some(((height - 1) * width) + (id - 1));
             }
         }
-    }
-
-    // check if we are still inbounds otherwise return none
-    if result < (width * height) {
-        return Option::Some(result);
-    } else {
-        return Option::None;
     }
 }
 

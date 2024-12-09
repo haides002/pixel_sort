@@ -77,36 +77,37 @@ struct ImageData {
 
 // ================================================================================================
 fn main() {
-    print!("reading image:		");
-    let mut image =
-        read_image("/home/linus/development/rust/pixel_sort/testing/test_image.png").unwrap();
-    print!("done\n");
-
-    print!("extracting spans:	");
-    let mut spans = extract_spans(
-        &image,
+    pixel_sort(
+        "/home/linus/development/rust/pixel_sort/testing/test_image.jpg",
+        "/home/linus/development/rust/pixel_sort/testing/output.png",
         Filter {
-            kind: HslComponent::Luminosity,
-            bottom: 0.35,
-            top: 1.0,
+            kind: HslComponent::Saturation,
+            bottom: 0.0,
+            top: 0.7,
         },
         Direction::Right,
     );
+}
+
+fn pixel_sort(source_path: &str, target_path: &str, filter: Filter, direction: Direction) {
+    print!("reading image:		");
+    let mut image = read_image(source_path).unwrap();
+    print!("done\n");
+
+    print!("extracting spans:	");
+    let mut spans = extract_spans(&image, filter, direction);
     print!("done({})\n", spans.len());
 
     print!("sorting spans:		");
-    let sorted_spans = sort_spans(&mut spans, HslComponent::Luminosity);
+    let sorted_spans = sort_spans(&mut spans, filter.kind);
     print!("done\n");
 
     print!("inserting spans:	");
-    insert_spans(&mut image, sorted_spans, Direction::Right);
+    insert_spans(&mut image, sorted_spans, direction);
     print!("done\n");
 
     print!("writing image:		");
-    write_image(
-        "/home/linus/development/rust/pixel_sort/testing/output.png",
-        image,
-    );
+    write_image(target_path, image);
     print!("done\n");
 }
 
@@ -364,14 +365,14 @@ fn read_image(file_path: &str) -> Result<ImageData, image::ImageError> {
     // i now haz a image_buffer
     let image_buffer = image::ImageReader::open(file_path)?.decode()?.into_rgb8();
 
-    // create the image data struct & give it width and height
+    // Create the image data struct and give it width and height.
     let mut image_data = ImageData {
         height: image_buffer.height(),
         width: image_buffer.width(),
         data: Vec::new(),
     };
 
-    // fill the data vector with pixel RGB values
+    // Fill the data vector with pixel RGB values.
     image_data.data = image_buffer
         .pixels()
         .into_iter()

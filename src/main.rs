@@ -104,8 +104,8 @@ fn main() {
 
     print!("writing image:		");
     write_image(
-        "/home/linus/development/rust/pixel_sort/testing/output.jpg",
-        &mut image,
+        "/home/linus/development/rust/pixel_sort/testing/output.png",
+        image,
     );
     print!("done\n");
 }
@@ -343,7 +343,7 @@ const fn next_pixel_id(id: u32, width: u32, height: u32, direction: Direction) -
 // ================================================================================================
 // file interaction functions using
 // https://docs.rs/image/latest/image
-fn write_image(file_path: &str, image_data: &mut ImageData) {
+fn write_image(file_path: &str, image_data: ImageData) {
     // create an imagebuffer with the size of our raw data
     let mut image_buffer: image::RgbImage =
         image::DynamicImage::new(image_data.width, image_data.height, image::ColorType::Rgb8)

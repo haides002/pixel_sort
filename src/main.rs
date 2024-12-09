@@ -41,6 +41,7 @@ struct Rgb8 {
     g: u8,
     b: u8,
 }
+
 #[derive(Clone, Copy)]
 struct Hsl {
     hue: f32,
@@ -76,33 +77,37 @@ struct ImageData {
 
 // ================================================================================================
 fn main() {
-    print!("reading image:");
+    print!("reading image:		");
     let mut image =
-        read_image("/home/linus/development/rust/pixel_sort/testing/test_image.jpg").unwrap();
-    print!(" done\n");
+        read_image("/home/linus/development/rust/pixel_sort/testing/test_image.png").unwrap();
+    print!("done\n");
 
-    print!("extracting spans:");
+    print!("extracting spans:	");
     let mut spans = extract_spans(
         &image,
         Filter {
             kind: HslComponent::Luminosity,
-            bottom: 0.45,
+            bottom: 0.35,
             top: 1.0,
         },
-        Direction::Up,
+        Direction::Right,
     );
-    print!(" done({})\n", spans.len());
+    print!("done({})\n", spans.len());
 
-    println!("sorting spans");
+    print!("sorting spans:		");
     let sorted_spans = sort_spans(&mut spans, HslComponent::Luminosity);
+    print!("done\n");
 
-    println!("inserting spans");
-    insert_spans(&mut image, sorted_spans, Direction::Up);
+    print!("inserting spans:	");
+    insert_spans(&mut image, sorted_spans, Direction::Right);
+    print!("done\n");
 
+    print!("writing image:		");
     write_image(
         "/home/linus/development/rust/pixel_sort/testing/output.jpg",
-        image,
+        &mut image,
     );
+    print!("done\n");
 }
 
 // ================================================================================================
@@ -144,7 +149,7 @@ fn extract_spans(image: &ImageData, filter: Filter, direction: Direction) -> Vec
         {
             if current_span.data.len() > 1 {
                 spans.push(current_span);
-            }
+            };
 
             current_span = Span {
                 position: Position { x: 0, y: 0 },
@@ -175,6 +180,7 @@ fn extract_spans(image: &ImageData, filter: Filter, direction: Direction) -> Vec
 
 fn insert_spans(image: &mut ImageData, spans: Vec<Span>, direction: Direction) -> &ImageData {
     for span in spans {
+        // Calculate span origin position as ID.
         let mut current_pixel_id: u32 = calculate_id(
             Position {
                 x: span.position.x,
@@ -182,11 +188,19 @@ fn insert_spans(image: &mut ImageData, spans: Vec<Span>, direction: Direction) -
             },
             image.width,
         );
+        //println!("Calculating span at id: {}.", current_pixel_id);
 
         for pixel in span.data {
             image.data[current_pixel_id as usize] = pixel;
-            current_pixel_id =
-                next_pixel_id(current_pixel_id, image.width, image.height, direction).unwrap();
+
+            match next_pixel_id(current_pixel_id, image.width, image.height, direction) {
+                Some(value) => {
+                    current_pixel_id = value;
+                }
+                None => {
+                    break;
+                }
+            }
         }
     }
     return image;
@@ -329,33 +343,17 @@ const fn next_pixel_id(id: u32, width: u32, height: u32, direction: Direction) -
 // ================================================================================================
 // file interaction functions using
 // https://docs.rs/image/latest/image
-
-fn write_image(file_path: &str, image_data: ImageData) {
+fn write_image(file_path: &str, image_data: &mut ImageData) {
     // create an imagebuffer with the size of our raw data
-    let mut image_buffer =
-        image::DynamicImage::new(image_data.width, image_data.height, image::ColorType::Rgb8);
+    let mut image_buffer: image::RgbImage =
+        image::DynamicImage::new(image_data.width, image_data.height, image::ColorType::Rgb8)
+            .into_rgb8();
 
     // write into the image buffer from the raw data
-    {
-        let mut y: u32 = 0;
-        let mut id: usize = 0;
-        while y < image_data.height {
-            let mut x: u32 = 0;
-            while x < image_data.width {
-                let pixel = image::Rgb {
-                    0: [
-                        image_data.data[id].rgb.r,
-                        image_data.data[id].rgb.g,
-                        image_data.data[id].rgb.b,
-                    ],
-                };
-
-                image_buffer.as_mut_rgb8().unwrap().put_pixel(x, y, pixel);
-                x = x + 1;
-                id = id + 1;
-            }
-            y = y + 1;
-        }
+    for (i, pixel) in image_buffer.pixels_mut().enumerate() {
+        pixel[0] = image_data.data[i].rgb.r;
+        pixel[1] = image_data.data[i].rgb.g;
+        pixel[2] = image_data.data[i].rgb.b;
     }
 
     // write the image buffer to disk
@@ -364,34 +362,21 @@ fn write_image(file_path: &str, image_data: ImageData) {
 
 fn read_image(file_path: &str) -> Result<ImageData, image::ImageError> {
     // i now haz a image_buffer
-    let binding = image::ImageReader::open(file_path)?.decode()?;
-    let image_buffer = binding
-        .as_rgb8()
-        .expect("Failed to convert image to rgb8 format!");
+    let image_buffer = image::ImageReader::open(file_path)?.decode()?.into_rgb8();
 
     // create the image data struct & give it width and height
     let mut image_data = ImageData {
         height: image_buffer.height(),
         width: image_buffer.width(),
-        data: vec![],
+        data: Vec::new(),
     };
 
     // fill the data vector with pixel RGB values
-    {
-        let mut y: u32 = 0;
-        while y < image_data.height {
-            let mut x: u32 = 0;
-            while x < image_data.width {
-                image_data.data.push(Pixel::new(
-                    image_buffer.get_pixel(x, y).0[0],
-                    image_buffer.get_pixel(x, y).0[1],
-                    image_buffer.get_pixel(x, y).0[2],
-                ));
-                x = x + 1;
-            }
-            y = y + 1;
-        }
-    }
+    image_data.data = image_buffer
+        .pixels()
+        .into_iter()
+        .map(|pixel: &image::Rgb<u8>| -> Pixel { Pixel::new(pixel.0[0], pixel.0[1], pixel.0[2]) })
+        .collect::<Vec<Pixel>>();
 
     return Ok(image_data);
 }

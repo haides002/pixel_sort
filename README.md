@@ -16,5 +16,4 @@ Just a stoopid project to mess around with rust and image modification, please d
 - [x] implement sort
 - [x] implement span insertion
 - [x] implement selection
-- [ ] implement commandline arguments
-- [ ] implement importing selection from file
+- [x] implement commandline arguments

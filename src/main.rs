@@ -1,3 +1,5 @@
+use clap::Parser;
+
 #[derive(Clone, Copy)]
 struct Filter {
     kind: HslComponent,
@@ -77,15 +79,17 @@ struct ImageData {
 
 // ================================================================================================
 fn main() {
+    let args: Args = PreArgs::parse().into_args();
+
     pixel_sort(
-        "/home/linus/development/rust/pixel_sort/testing/test_image.jpg",
-        "/home/linus/development/rust/pixel_sort/testing/output.png",
+        args.input.as_str(),
+        args.output.as_str(),
         Filter {
-            kind: HslComponent::Saturation,
-            bottom: 0.0,
-            top: 0.7,
+            kind: args.kind,
+            bottom: args.bottom,
+            top: args.top,
         },
-        Direction::Right,
+        args.direction,
     );
 }
 
@@ -109,6 +113,100 @@ fn pixel_sort(source_path: &str, target_path: &str, filter: Filter, direction: D
     print!("writing image:		");
     write_image(target_path, image);
     print!("done\n");
+}
+
+// ================================================================================================
+// argument parsing
+
+#[derive(clap::Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct PreArgs {
+    /// Path (absoloute or relative) to the input image.
+    #[arg(short, long)]
+    input: String,
+
+    /// Path (absoloute or relative) to the output image. The output will be overwritten something on the path allready exists.
+    #[arg(short, long)]
+    output: String,
+
+    /// The metric to select spans and sort by.
+    #[arg(short, long, default_value = "Luminosity")]
+    kind: String,
+
+    /// The bottom of the range to select.
+    #[arg(short, long, default_value_t = 0.0)]
+    bottom: f32,
+
+    /// The top of the range to select.
+    #[arg(short, long, default_value_t = 0.7)]
+    top: f32,
+
+    // The direction to select span in.
+    #[arg(short, long, default_value = "right")]
+    direction: String,
+}
+struct Args {
+    input: String,
+    output: String,
+
+    kind: HslComponent,
+    bottom: f32,
+    top: f32,
+
+    direction: Direction,
+}
+
+impl PreArgs {
+    fn into_args(&self) -> Args {
+        let input_path: String = std::fs::canonicalize(self.input.clone())
+            .expect("Invalid input path!")
+            .to_str()
+            .unwrap()
+            .into();
+
+        let output_path: String;
+
+        if std::path::absolute(self.output.clone())
+            .unwrap()
+            .parent()
+            .unwrap()
+            .is_dir()
+        {
+            output_path = std::path::absolute(self.output.clone())
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .into()
+        } else {
+            panic!("Invalid output path!");
+        }
+
+        Args {
+            input: input_path,
+            output: output_path,
+            kind: match self.kind.as_str() {
+                "Hue" | "hue" | "h" => HslComponent::Hue,
+                "Saturation" | "saturation" | "s" => HslComponent::Saturation,
+                "Luminosity" | "luminosity" | "l" => HslComponent::Luminosity,
+
+                _ => {
+                    panic!("Invalid filter kind!");
+                }
+            },
+            bottom: self.bottom,
+            top: self.top,
+            direction: match self.direction.as_str() {
+                "Up" | "up" | "u" => Direction::Up,
+                "Down" | "down" | "d" => Direction::Down,
+                "Left" | "left" | "l" => Direction::Left,
+                "Right" | "right" | "r" => Direction::Right,
+
+                _ => {
+                    panic!("Invalid direction!");
+                }
+            },
+        }
+    }
 }
 
 // ================================================================================================
@@ -247,7 +345,7 @@ fn sort_spans(spans: &mut Vec<Span>, sort_type: HslComponent) -> Vec<Span> {
 }
 
 // ================================================================================================
-// implement HSL calculation according to
+// Implement HSL calculation according to
 // https://www.niwa.nu/2013/05/math-behind-colorspace-conversions-rgb-hsl
 fn calculate_hsl(rgb_values: Rgb8) -> Hsl {
     let red: f32 = rgb_values.r as f32 / 255.0;
@@ -342,27 +440,27 @@ const fn next_pixel_id(id: u32, width: u32, height: u32, direction: Direction) -
 }
 
 // ================================================================================================
-// file interaction functions using
+// File interaction functions using:
 // https://docs.rs/image/latest/image
 fn write_image(file_path: &str, image_data: ImageData) {
-    // create an imagebuffer with the size of our raw data
+    // Create an imagebuffer with the size of our raw data.
     let mut image_buffer: image::RgbImage =
         image::DynamicImage::new(image_data.width, image_data.height, image::ColorType::Rgb8)
             .into_rgb8();
 
-    // write into the image buffer from the raw data
+    // Write into the image buffer from the raw data.
     for (i, pixel) in image_buffer.pixels_mut().enumerate() {
         pixel[0] = image_data.data[i].rgb.r;
         pixel[1] = image_data.data[i].rgb.g;
         pixel[2] = image_data.data[i].rgb.b;
     }
 
-    // write the image buffer to disk
+    // Write the image buffer to disk.
     image_buffer.save(file_path).unwrap();
 }
 
 fn read_image(file_path: &str) -> Result<ImageData, image::ImageError> {
-    // i now haz a image_buffer
+    // I now haz a image_buffer.
     let image_buffer = image::ImageReader::open(file_path)?.decode()?.into_rgb8();
 
     // Create the image data struct and give it width and height.

@@ -14,6 +14,7 @@ Just a stoopid project to mess around with rust and image modification, please d
 - [x] implement span struct
 - [x] implement span extraction
 - [x] implement sort
-- [x] implement span insertion
-- [x] implement selection
 - [x] implement commandline arguments
+
+</br>
+<img src="https://brainmade.org/white-logo.png" width=100px>

@@ -15,6 +15,8 @@ Just a stoopid project to mess around with rust and image modification, please d
 - [x] implement span extraction
 - [x] implement sort
 - [x] implement commandline arguments
+- [ ] fix printbuffer thing
+- [ ] make the printing prettier
 
 </br>
 <img src="https://brainmade.org/white-logo.png" width=100px>

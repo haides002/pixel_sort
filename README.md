@@ -2,7 +2,7 @@
 Just a stoopid project to mess around with rust and image modification, please don't use.
 
 # Issues
-- [ ] something goes wrong when sorting down with the grainy woods image
+- [x] something goes wrong when sorting down with the grainy woods image
 
 # Tasks
 - [x] implement image data struct
@@ -15,7 +15,7 @@ Just a stoopid project to mess around with rust and image modification, please d
 - [x] implement span extraction
 - [x] implement sort
 - [x] implement commandline arguments
-- [ ] fix printbuffer thing
+- [x] fix printbuffer thing
 - [ ] make the printing prettier
 
 </br>

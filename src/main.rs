@@ -170,7 +170,7 @@ struct Args {
     #[arg(short, long)]
     input: String,
 
-    /// Path (absoloute or relative) to the output image. The output will be overwritten something on the path allready exists.
+    /// Path (absoloute or relative) to the output image. The output will be overwritten if something on the path allready exists.
     #[arg(short, long)]
     output: String,
 

@@ -101,10 +101,17 @@ fn main() {
             top: arguments.top,
         },
         arguments.direction,
+        arguments.chance,
     );
 }
 
-fn pixel_sort(source_path: &str, target_path: &str, filter: Filter, direction: Direction) {
+fn pixel_sort(
+    source_path: &str,
+    target_path: &str,
+    filter: Filter,
+    direction: Direction,
+    break_chance: u32,
+) {
     fn check_eligibility(pixel: Pixel, filter: Filter) -> bool {
         match filter.kind {
             HslComponent::Hue => {
@@ -116,6 +123,13 @@ fn pixel_sort(source_path: &str, target_path: &str, filter: Filter, direction: D
             HslComponent::Saturation => {
                 pixel.hsl.saturation >= filter.bottom && pixel.hsl.saturation <= filter.top
             }
+        }
+    }
+
+    fn random_break(break_chance: u32) -> bool {
+        match break_chance {
+            0 => false,
+            _ => rand::random::<u32>() % break_chance == 0,
         }
     }
 
@@ -131,7 +145,9 @@ fn pixel_sort(source_path: &str, target_path: &str, filter: Filter, direction: D
         for i in 0..(image.width * image.height) {
             let i: usize = i as usize;
 
-            if (!check_eligibility(image.data[i], filter) || i % image.width as usize == 0)
+            if (!check_eligibility(image.data[i], filter)
+                || i % image.width as usize == 0
+                || random_break(break_chance))
                 && current_span.is_some()
             {
                 let span = &mut image.data[current_span.unwrap()..i];
@@ -186,9 +202,13 @@ struct Args {
     #[arg(short, long, default_value_t = 0.7)]
     top: f32,
 
-    // The direction to select span in.
+    /// The direction to select span in.
     #[arg(short, long, default_value_t)]
     direction: Direction,
+
+    /// The chance of random span breakage (chance: 1/x). 0 to disable.
+    #[arg(short, long, default_value_t = 0)]
+    chance: u32,
 }
 
 // ================================================================================================

@@ -1,7 +1,7 @@
 use clap::{Parser, ValueEnum};
 
 use core::fmt;
-use std::io::Write;
+use std::{io::Write, usize};
 
 #[derive(Clone, Copy)]
 struct Filter {
@@ -141,31 +141,16 @@ fn pixel_sort(
     print!("sorting spans: ");
     std::io::stdout().flush().unwrap();
     {
-        let mut current_span: Option<usize> = None;
+        let mut machine = SpanMachineState::new();
         for i in 0..(image.width * image.height) {
             let i: usize = i as usize;
 
-            if (!check_eligibility(image.data[i], filter)
-                || i % image.width as usize == 0
-                || random_break(break_chance))
-                && current_span.is_some()
-            {
-                let span = &mut image.data[current_span.unwrap()..i];
-
-                span.sort_unstable_by(|x: &Pixel, y: &Pixel| -> std::cmp::Ordering {
-                    match filter.kind {
-                        HslComponent::Luminosity => {
-                            x.hsl.luminosity.partial_cmp(&y.hsl.luminosity).unwrap()
-                        }
-                        HslComponent::Saturation => {
-                            x.hsl.saturation.partial_cmp(&y.hsl.saturation).unwrap()
-                        }
-                        HslComponent::Hue => x.hsl.hue.partial_cmp(&y.hsl.hue).unwrap(),
-                    }
-                });
-                current_span = None;
-            } else if check_eligibility(image.data[i], filter) && current_span.is_none() {
-                current_span = Some(i)
+            if !check_eligibility(image.data[i], filter) {
+                machine.transition(SpanMachineEvent::InvalidTarget(i), &mut image, &filter.kind);
+            } else if ((i as u32 - 1) % image.width) == 0 || random_break(break_chance) {
+                machine.transition(SpanMachineEvent::SpanBreak(i), &mut image, &filter.kind);
+            } else {
+                machine.transition(SpanMachineEvent::ValidTarget(i), &mut image, &filter.kind);
             }
         }
     }
@@ -175,6 +160,60 @@ fn pixel_sort(
     std::io::stdout().flush().unwrap();
     write_image(target_path, image, direction);
     print!("done\n");
+}
+
+// ================================================================================================
+// The M A C H I N E
+enum SpanMachineState {
+    OutSpan,
+    OnSpan(usize),
+}
+
+enum SpanMachineEvent {
+    InvalidTarget(usize),
+    ValidTarget(usize),
+    SpanBreak(usize),
+}
+
+impl SpanMachineState {
+    fn new() -> SpanMachineState {
+        SpanMachineState::OutSpan
+    }
+    fn transition(
+        &mut self,
+        event: SpanMachineEvent,
+        image: &mut ImageData,
+        filter_type: &HslComponent,
+    ) {
+        let comparison_function = |x: &Pixel, y: &Pixel| -> std::cmp::Ordering {
+            match filter_type {
+                HslComponent::Luminosity => {
+                    x.hsl.luminosity.partial_cmp(&y.hsl.luminosity).unwrap()
+                }
+                HslComponent::Saturation => {
+                    x.hsl.saturation.partial_cmp(&y.hsl.saturation).unwrap()
+                }
+                HslComponent::Hue => x.hsl.hue.partial_cmp(&y.hsl.hue).unwrap(),
+            }
+        };
+
+        match (&*self, event) {
+            (SpanMachineState::OutSpan, SpanMachineEvent::ValidTarget(id)) => {
+                *self = SpanMachineState::OnSpan(id);
+            }
+            (SpanMachineState::OnSpan(span_start), SpanMachineEvent::SpanBreak(id)) => {
+                let span = &mut image.data[*span_start..id];
+                span.sort_unstable_by(comparison_function);
+                *self = SpanMachineState::OnSpan(id);
+            }
+            (SpanMachineState::OnSpan(span_start), SpanMachineEvent::InvalidTarget(id)) => {
+                let span = &mut image.data[*span_start..id];
+                span.sort_unstable_by(comparison_function);
+                *self = SpanMachineState::OutSpan;
+            }
+            _ => {}
+        }
+    }
 }
 
 // ================================================================================================
